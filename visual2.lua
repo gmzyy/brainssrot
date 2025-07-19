@@ -3,25 +3,26 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- GUI protegido sin bloquear Delta
-local parentGui = RunService:IsStudio() and LocalPlayer:WaitForChild("PlayerGui") or gethui and gethui() or game:GetService("CoreGui")
+-- GUI protegida
+local parentGui = game:GetService("CoreGui")
+if RunService:IsStudio() then
+    parentGui = LocalPlayer:WaitForChild("PlayerGui")
+end
 
--- Eliminar GUI anterior si existe
-pcall(function()
-    if parentGui:FindFirstChild("GmzyyMenu") then
-        parentGui.GmzyyMenu:Destroy()
-    end
-end)
+-- Eliminar GUI anterior
+local existingGui = parentGui:FindFirstChild("GmzyyMenu")
+if existingGui then
+    existingGui:Destroy()
+end
 
--- Crear GUI sin capturar todo el input
+-- Crear GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "GmzyyMenu"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-if syn and syn.protect_gui then syn.protect_gui(gui) end
 gui.Parent = parentGui
 
--- Cuadro flotante pequeño
+-- Cuadro flotante
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 240, 0, 110)
 frame.Position = UDim2.new(0, 50, 0, 150)
@@ -35,9 +36,9 @@ Instance.new("UICorner", frame)
 -- Título
 local title = Instance.new("TextLabel", frame)
 title.Text = "gmzyy BRAINROT MENU"
-title.Size = UDim2.new(1,0,0,30)
+title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.TextColor3 = Color3.new(1,1,1)
+title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
@@ -55,9 +56,20 @@ closeBtn.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
--- Función de robo (solo visual/test)
+-- Etiqueta de estado
+local statusLabel = Instance.new("TextLabel", frame)
+statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Position = UDim2.new(0, 10, 0, 80)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.new(1, 1, 1)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.Text = "Status: Idle"
+
+-- Función de robo optimizada
 local function stealBrainrots()
-    task.wait(0.5)
+    statusLabel.Text = "Status: Stealing brainrots..."
+    local activeTweens = {}
 
     for _, ply in ipairs(Players:GetPlayers()) do
         if ply ~= LocalPlayer then
@@ -74,19 +86,27 @@ local function stealBrainrots()
                     if part then myBase.PrimaryPart = part end
                 end
 
-                for _, br in ipairs(theirBase:GetDescendants()) do
+                for _, br in ipairs(theirBase:GetChildren()) do
                     if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
                         local hrp = br.HumanoidRootPart
                         hrp.Anchored = true
-                        TweenService:Create(hrp, TweenInfo.new(2), {
-                            CFrame = myBase.PrimaryPart.CFrame * CFrame.new(0,5,0)
-                        }):Play()
-                        task.wait(0.5)
+                        local tween = TweenService:Create(hrp, TweenInfo.new(1), {
+                            CFrame = myBase.PrimaryPart.CFrame * CFrame.new(0, 5, 0)
+                        })
+                        table.insert(activeTweens, tween)
+                        tween:Play()
                     end
                 end
             end
         end
     end
+
+    task.delay(1.5, function()
+        for _, tween in ipairs(activeTweens) do
+            tween:Cancel()
+        end
+        statusLabel.Text = "Status: Done!"
+    end)
 end
 
 -- Botón
@@ -95,25 +115,28 @@ local function addButton(text, fn, y)
     btn.Size = UDim2.new(1, -20, 0, 30)
     btn.Position = UDim2.new(0, 10, 0, y)
     btn.Text = text
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.Gotham
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Gover
     btn.TextSize = 14
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     btn.AutoButtonColor = true
     Instance.new("UICorner", btn)
-    btn.MouseButton1Click:Connect(fn)
+    btn.MouseButton1Click:Connect(function()
+        coroutine.wrap(fn)()
+    end)
 end
 
 addButton("🧠 Steal Brainrots", stealBrainrots, 40)
 
--- Anti-kick simple
+-- Anti-kick
 pcall(function()
     if hookmetamethod then
-        hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            if getnamecallmethod() == "Kick" and tostring(self) == "Kick" then
-                return nil
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            if getnamecallmethod() == "Kick" then
+                return
             end
-            return self(...);
-        end))
+            return oldNamecall(self, ...)
+        end)
     end
 end)
