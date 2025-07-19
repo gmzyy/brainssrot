@@ -1,20 +1,22 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- Protección para evitar errores si ya existe
+-- GUI seguro para Delta
+local parentGui = RunService:IsStudio() and LocalPlayer:WaitForChild("PlayerGui") or gethui and gethui() or game:GetService("CoreGui")
+
 pcall(function()
-    if game.CoreGui:FindFirstChild("GmzyyMenu") then
-        game.CoreGui.GmzyyMenu:Destroy()
+    if parentGui:FindFirstChild("GmzyyMenu") then
+        parentGui.GmzyyMenu:Destroy()
     end
 end)
 
--- UI
 local gui = Instance.new("ScreenGui")
 gui.Name = "GmzyyMenu"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
-gui.Parent = game.CoreGui
+gui.Parent = parentGui
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 240, 0, 100)
@@ -33,22 +35,32 @@ title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
--- Función principal: Steal Brainrots
 local function stealBrainrots()
     for _, ply in ipairs(Players:GetPlayers()) do
         if ply ~= LocalPlayer then
             local theirBase = workspace:FindFirstChild("Base_".. ply.Name)
             local myBase = workspace:FindFirstChild("Base_".. LocalPlayer.Name)
-            if theirBase and myBase and theirBase.PrimaryPart and myBase.PrimaryPart then
-                for _, br in ipairs(theirBase:GetDescendants()) do
-                    if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
-                        local tween = TweenService:Create(
-                            br.HumanoidRootPart,
-                            TweenInfo.new(2, Enum.EasingStyle.Linear),
-                            {CFrame = myBase.PrimaryPart.CFrame * CFrame.new(0,5,0)}
-                        )
-                        tween:Play()
-                        task.wait(0.5) -- reducir lag
+            if theirBase and myBase then
+                -- Asegurar PrimaryPart
+                if not theirBase.PrimaryPart then
+                    theirBase.PrimaryPart = theirBase:FindFirstChildWhichIsA("BasePart")
+                end
+                if not myBase.PrimaryPart then
+                    myBase.PrimaryPart = myBase:FindFirstChildWhichIsA("BasePart")
+                end
+
+                if theirBase.PrimaryPart and myBase.PrimaryPart then
+                    for _, br in ipairs(theirBase:GetDescendants()) do
+                        if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
+                            br.HumanoidRootPart.Anchored = true
+                            local tween = TweenService:Create(
+                                br.HumanoidRootPart,
+                                TweenInfo.new(2, Enum.EasingStyle.Linear),
+                                {CFrame = myBase.PrimaryPart.CFrame * CFrame.new(0,5,0)}
+                            )
+                            tween:Play()
+                            task.wait(0.5)
+                        end
                     end
                 end
             end
@@ -56,7 +68,6 @@ local function stealBrainrots()
     end
 end
 
--- Botón
 local function addButton(text, fn, y)
     local btn = Instance.new("TextButton", frame)
     btn.Size = UDim2.new(1, -20, 0, 30)
@@ -73,14 +84,14 @@ end
 
 addButton("🧠 Steal Brainrots", stealBrainrots, 40)
 
--- Anti-kick (básico)
+-- Anti-kick
 pcall(function()
     if hookmetamethod then
         hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            if getnamecallmethod() == "Kick" then
+            if getnamecallmethod() == "Kick" and tostring(self) == "Kick" then
                 return nil
             end
-            return self(...);
+            return self(...)
         end))
     end
 end)
