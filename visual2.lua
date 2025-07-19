@@ -2,6 +2,13 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
+-- Protección para evitar errores si ya existe
+pcall(function()
+    if game.CoreGui:FindFirstChild("GmzyyMenu") then
+        game.CoreGui.GmzyyMenu:Destroy()
+    end
+end)
+
 -- UI
 local gui = Instance.new("ScreenGui")
 gui.Name = "GmzyyMenu"
@@ -10,7 +17,7 @@ gui.IgnoreGuiInset = true
 gui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 240, 0, 120)
+frame.Size = UDim2.new(0, 240, 0, 100)
 frame.Position = UDim2.new(0, 20, 0, 120)
 frame.BackgroundColor3 = Color3.fromRGB(24,24,24)
 frame.Active = true
@@ -26,7 +33,7 @@ title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
--- Steal Brainrots
+-- Función principal: Steal Brainrots
 local function stealBrainrots()
     for _, ply in ipairs(Players:GetPlayers()) do
         if ply ~= LocalPlayer then
@@ -35,12 +42,13 @@ local function stealBrainrots()
             if theirBase and myBase and theirBase.PrimaryPart and myBase.PrimaryPart then
                 for _, br in ipairs(theirBase:GetDescendants()) do
                     if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
-                        TweenService:Create(
+                        local tween = TweenService:Create(
                             br.HumanoidRootPart,
-                            TweenInfo.new(4, Enum.EasingStyle.Linear),
+                            TweenInfo.new(2, Enum.EasingStyle.Linear),
                             {CFrame = myBase.PrimaryPart.CFrame * CFrame.new(0,5,0)}
-                        ):Play()
-                        wait(4.5)
+                        )
+                        tween:Play()
+                        task.wait(0.5) -- reducir lag
                     end
                 end
             end
@@ -48,25 +56,7 @@ local function stealBrainrots()
     end
 end
 
--- Scan (solo consola)
-local function scanRares()
-    for _, ply in ipairs(Players:GetPlayers()) do
-        if ply ~= LocalPlayer then
-            local base = workspace:FindFirstChild("Base_".. ply.Name)
-            if base then
-                for _, br in ipairs(base:GetDescendants()) do
-                    if br:IsA("Model") and br.Name:match("God") then
-                        print("[SCAN] ".. ply.Name .. " tiene un Brainrot GOD!")
-                    elseif br:IsA("Model") and br.Name:match("Candy") then
-                        print("[SCAN] ".. ply.Name .. " tiene un Brainrot CANDY!")
-                    end
-                end
-            end
-        end
-    end
-end
-
--- UI Button
+-- Botón
 local function addButton(text, fn, y)
     local btn = Instance.new("TextButton", frame)
     btn.Size = UDim2.new(1, -20, 0, 30)
@@ -82,14 +72,15 @@ local function addButton(text, fn, y)
 end
 
 addButton("🧠 Steal Brainrots", stealBrainrots, 40)
-addButton("🔍 Scan Rare Brainrots", scanRares, 80)
 
--- Anti-kick básico
-if hookmetamethod then
-    hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        if getnamecallmethod() == "Kick" then
-            return nil
-        end
-        return self(...);
-    end))
-end
+-- Anti-kick (básico)
+pcall(function()
+    if hookmetamethod then
+        hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            if getnamecallmethod() == "Kick" then
+                return nil
+            end
+            return self(...);
+        end))
+    end
+end)
