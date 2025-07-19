@@ -10,7 +10,7 @@ gui.IgnoreGuiInset = true
 gui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 240, 0, 180)
+frame.Size = UDim2.new(0, 240, 0, 120)
 frame.Position = UDim2.new(0, 20, 0, 120)
 frame.BackgroundColor3 = Color3.fromRGB(24,24,24)
 frame.Active = true
@@ -26,7 +26,7 @@ title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
--- Funciones del menú
+-- Steal Brainrots
 local function stealBrainrots()
     for _, ply in ipairs(Players:GetPlayers()) do
         if ply ~= LocalPlayer then
@@ -48,16 +48,8 @@ local function stealBrainrots()
     end
 end
 
-local function autoBubblegum()
-    local machine = workspace:FindFirstChild("BubbleGumMachine")
-    local countVal = LocalPlayer:FindFirstChild("BrainrotCount")
-    if machine and countVal and countVal.Value >= 10 then
-        local prompt = machine:FindFirstChildWhichIsA("ProximityPrompt")
-        if prompt then fireproximityprompt(prompt) end
-    end
-end
-
-local function autoScan()
+-- Scan (solo consola)
+local function scanRares()
     for _, ply in ipairs(Players:GetPlayers()) do
         if ply ~= LocalPlayer then
             local base = workspace:FindFirstChild("Base_".. ply.Name)
@@ -65,8 +57,7 @@ local function autoScan()
                 for _, br in ipairs(base:GetDescendants()) do
                     if br:IsA("Model") and br.Name:match("God") then
                         print("[SCAN] ".. ply.Name .. " tiene un Brainrot GOD!")
-                    end
-                    if br:IsA("Model") and br.Name:match("Candy") then
+                    elseif br:IsA("Model") and br.Name:match("Candy") then
                         print("[SCAN] ".. ply.Name .. " tiene un Brainrot CANDY!")
                     end
                 end
@@ -75,7 +66,7 @@ local function autoScan()
     end
 end
 
--- UI Helpers
+-- UI Button
 local function addButton(text, fn, y)
     local btn = Instance.new("TextButton", frame)
     btn.Size = UDim2.new(1, -20, 0, 30)
@@ -91,8 +82,7 @@ local function addButton(text, fn, y)
 end
 
 addButton("🧠 Steal Brainrots", stealBrainrots, 40)
-addButton("🍬 Auto Bubblegum", autoBubblegum, 80)
-addButton("🔍 Auto Scan Rare", autoScan, 120)
+addButton("🔍 Scan Rare Brainrots", scanRares, 80)
 
 -- Anti-kick básico
 if hookmetamethod then
