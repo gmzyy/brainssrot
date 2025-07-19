@@ -6,11 +6,12 @@ local Workspace = game:GetService("Workspace")
 
 -- Configuración
 local CONFIG = {
-    TWEEN_DURATION = 1.5, -- Duración del tween para movimiento natural
-    MAX_DISTANCE = 15, -- Distancia máxima para considerar un brainrot "en tus manos"
-    CHECK_INTERVAL = 0.5, -- Intervalo para verificar brainrots
-    RANDOM_DELAY_MIN = 0.1, -- Retraso aleatorio mínimo
-    RANDOM_DELAY_MAX = 0.3, -- Retraso aleatorio máximo
+    TWEEN_DURATION = 2, -- Duración del tween para movimiento natural
+    MAX_DISTANCE = 10, -- Distancia máxima para considerar un brainrot "en tus manos"
+    CHECK_INTERVAL = 1, -- Intervalo para verificar brainrots
+    RANDOM_DELAY_MIN = 0.2, -- Retraso aleatorio mínimo
+    RANDOM_DELAY_MAX = 0.4, -- Retraso aleatorio máximo
+    ENEMY_CHECK_DISTANCE = 50, -- Distancia para verificar jugadores enemigos
 }
 
 -- Lista de brainrots valiosos (basado en la wiki)
@@ -18,7 +19,6 @@ local VALUABLE_BRAINROTS = {
     ["Graipuss Medussi"] = {cost = 250000000, income = 1000000},
     ["Los Tralaleritos"] = {cost = 100000000, income = 500000},
     ["La Vacca Saturno"] = {cost = 50000000, income = 250000},
-    -- Mutaciones raras (pueden aplicarse a cualquier brainrot)
     Mutations = {"Galactic", "Golden", "Diamond", "Rainbow"}
 }
 
@@ -40,7 +40,7 @@ gui.Parent = parentGui
 
 -- Cuadro flotante
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Size = UDim2.new(0, 300, 0, 220)
 frame.Position = UDim2.new(0, 50, 0, 150)
 frame.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 frame.Active = true
@@ -61,7 +61,7 @@ title.TextSize = 16
 -- Etiqueta de estado
 local statusLabel = Instance.new("TextLabel", frame)
 statusLabel.Size = UDim2.new(1, -20, 0, 20)
-statusLabel.Position = UDim2.new(0, 10, 0, 160)
+statusLabel.Position = UDim2.new(0, 10, 0, 180)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.new(1, 1, 1)
 statusLabel.Font = Enum.Font.Gotham
@@ -70,7 +70,7 @@ statusLabel.Text = "Status: Idle"
 
 -- Lista de brainrots valiosos
 local valuableList = Instance.new("TextLabel", frame)
-valuableList.Size = UDim2.new(1, -20, 0, 80)
+valuableList.Size = UDim2.new(1, -20, 0, 100)
 valuableList.Position = UDim2.new(0, 10, 0, 80)
 valuableList.BackgroundTransparency = 1
 valuableList.TextColor3 = Color3.new(1, 1, 1)
@@ -113,12 +113,58 @@ end
 
 -- Función para obtener la base del jugador
 local function getPlayerBase()
-    local base = Workspace:FindFirstChild("Base_" .. LocalPlayer.Name)
+    local baseNames = {
+        "Base_" .. LocalPlayer.Name,
+        "Plot_" .. LocalPlayer.Name,
+        "Base_" .. LocalPlayer.UserId,
+        "Plot_" .. LocalPlayer.UserId
+    }
+    local base
+    -- Buscar en Workspace
+    for _, name in ipairs(baseNames) do
+        base = Workspace:FindFirstChild(name)
+        if base then break end
+    end
+    -- Buscar en Workspace.Plots
+    if not base then
+        local plots = Workspace:FindFirstChild("Plots")
+        if plots then
+            for _, name in ipairs(baseNames) do
+                base = plots:FindFirstChild(name)
+                if base then break end
+            end
+        end
+    end
+    -- Asignar PrimaryPart si no existe
     if base and not base:FindFirstChild("PrimaryPart") then
-        local part = base:FindFirstChildWhichIsA("BasePart")
-        if part then base.PrimaryPart = part end
+        local part = base:FindFirstChildWhichIsA("BasePart") or
+                     base:FindFirstChild("BasePlate") or
+                     base:FindFirstChild("Root") or
+                     base:FindFirstChild("MainPart")
+        if part then
+            base.PrimaryPart = part
+            statusLabel.Text = "Status: Base encontrada: " .. base.Name
+        end
     end
     return base
+end
+
+-- Función para verificar si hay jugadores enemigos cerca
+local function isEnemyNearby()
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    local hrp = character.HumanoidRootPart
+    for _, ply in ipairs(Players:GetPlayers()) do
+        if ply ~= LocalPlayer and ply.Character and ply.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (hrp.Position - ply.Character.HumanoidRootPart.Position).Magnitude
+            if distance < CONFIG.ENEMY_CHECK_DISTANCE then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 -- Función para verificar si el brainrot está siendo llevado por el jugador
@@ -128,32 +174,44 @@ local function isBrainrotInHands(brainrot)
         return false
     end
     local hrp = character.HumanoidRootPart
-    local brainrotHrp = brainrot:FindFirstChild("HumanoidRootPart")
+    local brainrotHrp = brainrot:FindFirstChild("HumanoidRootPart") or
+                        brainrot:FindFirstChild("Root") or
+                        brainrot:FindFirstChild("MainPart")
     if not brainrotHrp then
         return false
     end
-    -- Verificar si el brainrot está cerca y sigue al jugador (estado de "robado")
+    -- Verificar si el brainrot está cerca y sigue al jugador
     local distance = (hrp.Position - brainrotHrp.Position).Magnitude
     local isFollowing = not brainrotHrp.Anchored and distance <= CONFIG.MAX_DISTANCE
-    return isFollowing
+    -- Verificar si tiene BodyPosition o BodyVelocity (indica que sigue al jugador)
+    local hasBodyMover = brainrotHrp:FindFirstChildWhichIsA("BodyPosition") or
+                         brainrotHrp:FindFirstChildWhichIsA("BodyVelocity")
+    return isFollowing or hasBodyMover
 end
 
 -- Función para mover brainrot a la base
 local function moveBrainrotToBase(brainrot)
+    if isEnemyNearby() then
+        statusLabel.Text = "Status: Jugadores cerca, esperando..."
+        return
+    end
+
     local myBase = getPlayerBase()
     if not myBase or not myBase.PrimaryPart then
         statusLabel.Text = "Status: Base no encontrada"
         return
     end
 
-    local brainrotHrp = brainrot:FindFirstChild("HumanoidRootPart")
+    local brainrotHrp = brainrot:FindFirstChild("HumanoidRootPart") or
+                        brainrot:FindFirstChild("Root") or
+                        brainrot:FindFirstChild("MainPart")
     if not brainrotHrp then
         statusLabel.Text = "Status: Brainrot inválido"
         return
     end
 
     -- Verificar si la base está bloqueada
-    local laserGate = myBase:FindFirstChild("Gate") -- Ajusta según el nombre real
+    local laserGate = myBase:FindFirstChild("Gate") or myBase:FindFirstChild("LaserGate") or myBase:FindFirstChild("Barrier")
     if laserGate and laserGate:IsA("BasePart") and laserGate.Transparency == 0 then
         statusLabel.Text = "Status: Base bloqueada, esperando..."
         task.wait(5)
@@ -165,7 +223,7 @@ local function moveBrainrotToBase(brainrot)
 
     -- Simular movimiento natural a la base
     local targetCFrame = myBase.PrimaryPart.CFrame * CFrame.new(0, 5, 0)
-    local tweenInfo = TweenInfo.new(CONFIG.TWEEN_DURATION, Enum.EasingStyle.Linear)
+    local tweenInfo = TweenInfo.new(CONFIG.TWEEN_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
     local tween = TweenService:Create(brainrotHrp, tweenInfo, {CFrame = targetCFrame})
     tween:Play()
 
@@ -185,25 +243,47 @@ local function listValuableBrainrots()
     local valuableFound = {}
 
     -- Escanear bases de otros jugadores
-    for _, ply in ipairs(Players:GetPlayers()) do
-        if ply ~= LocalPlayer then
-            local theirBase = Workspace:FindFirstChild("Base_" .. ply.Name)
-            if theirBase then
-                for _, br in ipairs(theirBase:GetChildren()) do
-                    if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
-                        local brName = br.Name
-                        local isValuable = VALUABLE_BRAINROTS[brName] or false
-                        -- Verificar mutaciones (basado en nombres o propiedades)
-                        local hasMutation = false
-                        for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
-                            if string.find(brName:lower(), mutation:lower()) then
-                                hasMutation = true
-                                break
+    local function scanBases(container)
+        for _, ply in ipairs(Players:GetPlayers()) do
+            if ply ~= LocalPlayer then
+                local theirBase = container:FindFirstChild("Base_" .. ply.Name) or
+                                  container:FindFirstChild("Plot_" .. ply.Name) or
+                                  container:FindFirstChild("Base_" .. ply.UserId) or
+                                  container:FindFirstChild("Plot_" .. ply.UserId)
+                if theirBase then
+                    for _, br in ipairs(theirBase:GetChildren()) do
+                        if br:IsA("Model") then
+                            local brHrp = br:FindFirstChild("HumanoidRootPart") or
+                                          br:FindFirstChild("Root") or
+                                          br:FindFirstChild("MainPart")
+                            if brHrp then
+                                local brName = br.Name
+                                local isValuable = VALUABLE_BRAINROTS[brName] or false
+                                local hasMutation = false
+                                -- Verificar mutaciones en el nombre
+                                for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
+                                    if string.find(brName:lower(), mutation:lower()) then
+                                        hasMutation = true
+                                        break
+                                    end
+                                end
+                                -- Verificar mutaciones en propiedades
+                                local mutationValue = br:FindFirstChild("Mutation") or br:FindFirstChild("Variant")
+                                if mutationValue and mutationValue:IsA("StringValue") then
+                                    for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
+                                        if mutationValue.Value:lower() == mutation:lower() then
+                                            hasMutation = true
+                                            break
+                                        end
+                                    end
+                                end
+                                if isValuable or hasMutation then
+                                    local income = isValuable and VALUABLE_BRAINROTS[brName].income or "Unknown"
+                                    local distance = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
+                                                    (brHrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude or "Unknown"
+                                    table.insert(valuableFound, string.format("%s (%s/s, %.1f studs) en base de %s", brName, tostring(income), distance, ply.Name))
+                                end
                             end
-                        end
-                        if isValuable or hasMutation then
-                            local income = isValuable and VALUABLE_BRAINROTS[brName].income or "Unknown"
-                            table.insert(valuableFound, string.format("%s (%s/s) en base de %s", brName, tostring(income), ply.Name))
                         end
                     end
                 end
@@ -211,26 +291,54 @@ local function listValuableBrainrots()
         end
     end
 
+    -- Escanear en Workspace y Workspace.Plots
+    scanBases(Workspace)
+    local plots = Workspace:FindFirstChild("Plots")
+    if plots then scanBases(plots) end
+
     -- Escanear conveyor central
-    local conveyor = Workspace:FindFirstChild("Conveyor") -- Ajusta según el nombre real
+    local conveyorNames = {"Conveyor", "ConveyorBelt", "BrainrotSpawner"}
+    local conveyor
+    for _, name in ipairs(conveyorNames) do
+        conveyor = Workspace:FindFirstChild(name)
+        if conveyor then break end
+    end
     if conveyor then
         for _, br in ipairs(conveyor:GetChildren()) do
-            if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
-                local brName = br.Name
-                local isValuable = VALUABLE_BRAINROTS[brName] or false
-                local hasMutation = false
-                for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
-                    if string.find(brName:lower(), mutation:lower()) then
-                        hasMutation = true
-                        break
+            if br:IsA("Model") then
+                local brHrp = br:FindFirstChild("HumanoidRootPart") or
+                              br:FindFirstChild("Root") or
+                              br:FindFirstChild("MainPart")
+                if brHrp then
+                    local brName = br.Name
+                    local isValuable = VALUABLE_BRAINROTS[brName] or false
+                    local hasMutation = false
+                    for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
+                        if string.find(brName:lower(), mutation:lower()) then
+                            hasMutation = true
+                            break
+                        end
                     end
-                end
-                if isValuable or hasMutation then
-                    local income = isValuable and VALUABLE_BRAINROTS[brName].income or "Unknown"
-                    table.insert(valuableFound, string.format("%s (%s/s) en conveyor", brName, tostring(income)))
+                    local mutationValue = br:FindFirstChild("Mutation") or br:FindFirstChild("Variant")
+                    if mutationValue and mutationValue:IsA("StringValue") then
+                        for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
+                            if mutationValue.Value:lower() == mutation:lower() then
+                                hasMutation = true
+                                break
+                            end
+                        end
+                    end
+                    if isValuable or hasMutation then
+                        local income = isValuable and VALUABLE_BRAINROTS[brName].income or "Unknown"
+                        local distance = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
+                                        (brHrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude or "Unknown"
+                        table.insert(valuableFound, string.format("%s (%s/s, %.1f studs) en conveyor", brName, tostring(income), distance))
+                    end
                 end
             end
         end
+    else
+        statusLabel.Text = "Status: Conveyor no encontrado"
     end
 
     -- Actualizar GUI
@@ -247,17 +355,23 @@ local function stealBrainrots()
     statusLabel.Text = "Status: Buscando brainrots robados..."
 
     while true do
-        task.wait(math.random(CONFIG.RANDOM_DELAY_MIN, CONFIG.RANDOM_DELAY_MAX))
+        task.wait(CONFIG.CHECK_INTERVAL)
 
-        -- Buscar brainrots en las manos del jugador
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
-                if isBrainrotInHands(obj) then
-                    statusLabel.Text = "Status: Brainrot robado detectado!"
-                    moveBrainrotToBase(obj)
-                    task.wait(CONFIG.TWEEN_DURATION + 0.5)
+        if isEnemyNearby() then
+            statusLabel.Text = "Status: Jugadores cerca, esperando..."
+            task.wait(2)
+        else
+            pcall(function()
+                for _, obj in ipairs(Workspace:GetChildren()) do
+                    if obj:IsA("Model") then
+                        if isBrainrotInHands(obj) then
+                            statusLabel.Text = "Status: Brainrot robado detectado!"
+                            moveBrainrotToBase(obj)
+                            task.wait(CONFIG.TWEEN_DURATION + 0.5)
+                        end
+                    end
                 end
-            end
+            end)
         end
     end
 end
