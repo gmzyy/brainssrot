@@ -6,16 +6,19 @@ local LocalPlayer = Players.LocalPlayer
 -- GUI seguro para Delta
 local parentGui = RunService:IsStudio() and LocalPlayer:WaitForChild("PlayerGui") or gethui and gethui() or game:GetService("CoreGui")
 
+-- Eliminar si ya existe
 pcall(function()
     if parentGui:FindFirstChild("GmzyyMenu") then
         parentGui.GmzyyMenu:Destroy()
     end
 end)
 
+-- Crear GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "GmzyyMenu"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+if syn and syn.protect_gui then syn.protect_gui(gui) end
 gui.Parent = parentGui
 
 local frame = Instance.new("Frame", gui)
@@ -35,26 +38,47 @@ title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
+-- Botón para cerrar la interfaz
+local closeBtn = Instance.new("TextButton", frame)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 0, 0)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+closeBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
+Instance.new("UICorner", closeBtn)
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- Función principal
 local function stealBrainrots()
+    task.wait(0.5)
+
     for _, ply in ipairs(Players:GetPlayers()) do
         if ply ~= LocalPlayer then
-            local theirBase = workspace:FindFirstChild("Base_".. ply.Name)
-            local myBase = workspace:FindFirstChild("Base_".. LocalPlayer.Name)
+            local theirBase = workspace:FindFirstChild("Base_" .. ply.Name)
+            local myBase = workspace:FindFirstChild("Base_" .. LocalPlayer.Name)
+
             if theirBase and myBase then
                 -- Asegurar PrimaryPart
                 if not theirBase.PrimaryPart then
-                    theirBase.PrimaryPart = theirBase:FindFirstChildWhichIsA("BasePart")
+                    local basePart = theirBase:FindFirstChild("HumanoidRootPart") or theirBase:FindFirstChildWhichIsA("BasePart")
+                    if basePart then theirBase.PrimaryPart = basePart end
                 end
                 if not myBase.PrimaryPart then
-                    myBase.PrimaryPart = myBase:FindFirstChildWhichIsA("BasePart")
+                    local basePart = myBase:FindFirstChild("HumanoidRootPart") or myBase:FindFirstChildWhichIsA("BasePart")
+                    if basePart then myBase.PrimaryPart = basePart end
                 end
 
                 if theirBase.PrimaryPart and myBase.PrimaryPart then
                     for _, br in ipairs(theirBase:GetDescendants()) do
                         if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
-                            br.HumanoidRootPart.Anchored = true
+                            local hrp = br.HumanoidRootPart
+                            hrp.Anchored = true
                             local tween = TweenService:Create(
-                                br.HumanoidRootPart,
+                                hrp,
                                 TweenInfo.new(2, Enum.EasingStyle.Linear),
                                 {CFrame = myBase.PrimaryPart.CFrame * CFrame.new(0,5,0)}
                             )
@@ -68,6 +92,7 @@ local function stealBrainrots()
     end
 end
 
+-- Agregar botón
 local function addButton(text, fn, y)
     local btn = Instance.new("TextButton", frame)
     btn.Size = UDim2.new(1, -20, 0, 30)
@@ -84,7 +109,7 @@ end
 
 addButton("🧠 Steal Brainrots", stealBrainrots, 40)
 
--- Anti-kick
+-- Anti-kick básico
 pcall(function()
     if hookmetamethod then
         hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
