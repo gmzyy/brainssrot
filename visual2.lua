@@ -1,31 +1,38 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- Crear GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "GmzyyMenu"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
+-- GUI protegido sin bloquear Delta
+local parentGui = RunService:IsStudio() and LocalPlayer:WaitForChild("PlayerGui") or gethui and gethui() or game:GetService("CoreGui")
 
--- Intentar proteger GUI (solo si syn disponible)
+-- Eliminar GUI anterior si existe
 pcall(function()
-    if syn and syn.protect_gui then
-        syn.protect_gui(gui)
+    if parentGui:FindFirstChild("GmzyyMenu") then
+        parentGui.GmzyyMenu:Destroy()
     end
 end)
 
-gui.Parent = game:GetService("CoreGui")
+-- Crear GUI sin capturar todo el input
+local gui = Instance.new("ScreenGui")
+gui.Name = "GmzyyMenu"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+if syn and syn.protect_gui then syn.protect_gui(gui) end
+gui.Parent = parentGui
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 240, 0, 100)
-frame.Position = UDim2.new(0, 20, 0, 120)
-frame.BackgroundColor3 = Color3.fromRGB(24,24,24)
+-- Cuadro flotante pequeño
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 110)
+frame.Position = UDim2.new(0, 50, 0, 150)
+frame.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 frame.Active = true
 frame.Draggable = true
-frame.Selectable = true
+frame.Selectable = false
+frame.Parent = gui
 Instance.new("UICorner", frame)
 
+-- Título
 local title = Instance.new("TextLabel", frame)
 title.Text = "gmzyy BRAINROT MENU"
 title.Size = UDim2.new(1,0,0,30)
@@ -34,6 +41,7 @@ title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
+-- Botón cerrar
 local closeBtn = Instance.new("TextButton", frame)
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -35, 0, 5)
@@ -47,9 +55,9 @@ closeBtn.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
--- Función principal
+-- Función de robo (solo visual/test)
 local function stealBrainrots()
-    print("Ejecutando Steal Brainrots...")
+    task.wait(0.5)
 
     for _, ply in ipairs(Players:GetPlayers()) do
         if ply ~= LocalPlayer then
@@ -57,17 +65,23 @@ local function stealBrainrots()
             local myBase = workspace:FindFirstChild("Base_" .. LocalPlayer.Name)
 
             if theirBase and myBase then
-                local primary1 = theirBase:FindFirstChild("HumanoidRootPart") or theirBase:FindFirstChildWhichIsA("BasePart")
-                local primary2 = myBase:FindFirstChild("HumanoidRootPart") or myBase:FindFirstChildWhichIsA("BasePart")
-                if primary1 and primary2 then
-                    for _, br in ipairs(theirBase:GetDescendants()) do
-                        if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
-                            local hrp = br.HumanoidRootPart
-                            hrp.Anchored = true
-                            TweenService:Create(hrp, TweenInfo.new(1), {
-                                CFrame = primary2.CFrame * CFrame.new(0, 5, 0)
-                            }):Play()
-                        end
+                if not theirBase.PrimaryPart then
+                    local part = theirBase:FindFirstChildWhichIsA("BasePart")
+                    if part then theirBase.PrimaryPart = part end
+                end
+                if not myBase.PrimaryPart then
+                    local part = myBase:FindFirstChildWhichIsA("BasePart")
+                    if part then myBase.PrimaryPart = part end
+                end
+
+                for _, br in ipairs(theirBase:GetDescendants()) do
+                    if br:IsA("Model") and br:FindFirstChild("HumanoidRootPart") then
+                        local hrp = br.HumanoidRootPart
+                        hrp.Anchored = true
+                        TweenService:Create(hrp, TweenInfo.new(2), {
+                            CFrame = myBase.PrimaryPart.CFrame * CFrame.new(0,5,0)
+                        }):Play()
+                        task.wait(0.5)
                     end
                 end
             end
@@ -92,15 +106,14 @@ end
 
 addButton("🧠 Steal Brainrots", stealBrainrots, 40)
 
--- Anti-Kick simple
+-- Anti-kick simple
 pcall(function()
     if hookmetamethod then
         hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            if getnamecallmethod() == "Kick" then
-                print("Intento de Kick bloqueado")
-                return
+            if getnamecallmethod() == "Kick" and tostring(self) == "Kick" then
+                return nil
             end
-            return self(...)
+            return self(...);
         end))
     end
 end)
