@@ -1,14 +1,21 @@
--- gmzyy MENU PÚBLICO (sin spawneo)
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 -- UI
-local gui = Instance.new("ScreenGui", game.CoreGui)
+local gui = Instance.new("ScreenGui")
+gui.Name = "GmzyyMenu"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = game.CoreGui
+
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 240, 0, 180)
 frame.Position = UDim2.new(0, 20, 0, 120)
 frame.BackgroundColor3 = Color3.fromRGB(24,24,24)
+frame.Active = true
+frame.Draggable = true
+frame.Selectable = true
 Instance.new("UICorner", frame)
 
 local title = Instance.new("TextLabel", frame)
@@ -78,6 +85,7 @@ local function addButton(text, fn, y)
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
     btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    btn.AutoButtonColor = true
     Instance.new("UICorner", btn)
     btn.MouseButton1Click:Connect(fn)
 end
@@ -92,6 +100,6 @@ if hookmetamethod then
         if getnamecallmethod() == "Kick" then
             return nil
         end
-        return self(...)
+        return self(...);
     end))
 end
