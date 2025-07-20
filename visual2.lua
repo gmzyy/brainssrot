@@ -1,17 +1,20 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
+local remote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("StealRemote")
 
 -- Configuración
 local CONFIG = {
-    TWEEN_DURATION = 2, -- Duración del tween para movimiento natural
+    TWEEN_DURATION = 2, -- Duración del tween para movimientos naturales
     MAX_DISTANCE = 10, -- Distancia máxima para considerar un brainrot "en tus manos"
     CHECK_INTERVAL = 1, -- Intervalo para verificar brainrots
     RANDOM_DELAY_MIN = 0.2, -- Retraso aleatorio mínimo
     RANDOM_DELAY_MAX = 0.4, -- Retraso aleatorio máximo
     ENEMY_CHECK_DISTANCE = 50, -- Distancia para verificar jugadores enemigos
+    ROOF_HEIGHT = 20, -- Altura para teletransportarse al techo
 }
 
 -- Lista de brainrots valiosos (basado en la wiki)
@@ -26,42 +29,61 @@ local VALUABLE_BRAINROTS = {
 local parentGui = RunService:IsStudio() and LocalPlayer:WaitForChild("PlayerGui") or game:GetService("CoreGui")
 
 -- Eliminar GUI anterior
-local existingGui = parentGui:FindFirstChild("GmzyyMenu")
+local existingGui = parentGui:FindFirstChild("MartinBrainrotGUI")
 if existingGui then
     existingGui:Destroy()
 end
 
--- Crear GUI
+-- Crear GUI con animación de introducción
 local gui = Instance.new("ScreenGui")
-gui.Name = "GmzyyMenu"
+gui.Name = "MartinBrainrotGUI"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = parentGui
 
--- Cuadro flotante
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 220)
-frame.Position = UDim2.new(0, 50, 0, 150)
-frame.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+local intro = Instance.new("TextLabel", gui)
+intro.Size = UDim2.new(0, 400, 0, 100)
+intro.Position = UDim2.new(0.5, -200, 0.4, 0)
+intro.BackgroundTransparency = 1
+intro.Text = "MADE BY GROK"
+intro.TextColor3 = Color3.fromRGB(255, 255, 255)
+intro.TextScaled = true
+intro.Font = Enum.Font.GothamBold
+intro.TextTransparency = 1
+
+local tweenIn = TweenService:Create(intro, TweenInfo.new(1, Enum.EasingStyle.Quad), {TextTransparency = 0})
+local tweenOut = TweenService:Create(intro, TweenInfo.new(1, Enum.EasingStyle.Quad), {TextTransparency = 1})
+tweenIn:Play()
+tweenIn.Completed:Wait()
+task.wait(1)
+tweenOut:Play()
+tweenOut.Completed:Connect(function()
+    intro:Destroy()
+end)
+
+-- Cuadro principal
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 180)
+frame.Position = UDim2.new(0.05, 0, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.Active = true
 frame.Draggable = true
-frame.Selectable = false
-frame.Parent = gui
 Instance.new("UICorner", frame)
 
 -- Título
 local title = Instance.new("TextLabel", frame)
-title.Text = "gmzyy BRAINROT MENU"
 title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
+title.Text = "Brainrot Stealer 😎"
 title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
+title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+Instance.new("UICorner", title)
 
 -- Etiqueta de estado
 local statusLabel = Instance.new("TextLabel", frame)
 statusLabel.Size = UDim2.new(1, -20, 0, 20)
-statusLabel.Position = UDim2.new(0, 10, 0, 180)
+statusLabel.Position = UDim2.new(0, 10, 0, 140)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.new(1, 1, 1)
 statusLabel.Font = Enum.Font.Gotham
@@ -70,7 +92,7 @@ statusLabel.Text = "Status: Idle"
 
 -- Lista de brainrots valiosos
 local valuableList = Instance.new("TextLabel", frame)
-valuableList.Size = UDim2.new(1, -20, 0, 100)
+valuableList.Size = UDim2.new(1, -20, 0, 60)
 valuableList.Position = UDim2.new(0, 10, 0, 80)
 valuableList.BackgroundTransparency = 1
 valuableList.TextColor3 = Color3.new(1, 1, 1)
@@ -103,7 +125,7 @@ local function addButton(text, fn, y)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
     btn.AutoButtonColor = true
     Instance.new("UICorner", btn)
     btn.MouseButton1Click:Connect(function()
@@ -117,25 +139,26 @@ local function getPlayerBase()
         "Base_" .. LocalPlayer.Name,
         "Plot_" .. LocalPlayer.Name,
         "Base_" .. LocalPlayer.UserId,
-        "Plot_" .. LocalPlayer.UserId
+        "Plot_" .. LocalPlayer.UserId,
+        "Base_" .. LocalPlayer.DisplayName,
+        "Plot_" .. LocalPlayer.DisplayName
     }
     local base
-    -- Buscar en Workspace
     for _, name in ipairs(baseNames) do
         base = Workspace:FindFirstChild(name)
         if base then break end
     end
-    -- Buscar en Workspace.Plots
     if not base then
-        local plots = Workspace:FindFirstChild("Plots")
-        if plots then
-            for _, name in ipairs(baseNames) do
-                base = plots:FindFirstChild(name)
+        for _, folder in ipairs(Workspace:GetChildren()) do
+            if folder:IsA("Folder") or folder:IsA("Model") then
+                for _, name in ipairs(baseNames) do
+                    base = folder:FindFirstChild(name)
+                    if base then break end
+                end
                 if base then break end
             end
         end
     end
-    -- Asignar PrimaryPart si no existe
     if base and not base:FindFirstChild("PrimaryPart") then
         local part = base:FindFirstChildWhichIsA("BasePart") or
                      base:FindFirstChild("BasePlate") or
@@ -167,7 +190,7 @@ local function isEnemyNearby()
     return false
 end
 
--- Función para verificar si el brainrot está siendo llevado por el jugador
+-- Función para verificar si el brainrot está siendo llevado
 local function isBrainrotInHands(brainrot)
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
@@ -180,13 +203,12 @@ local function isBrainrotInHands(brainrot)
     if not brainrotHrp then
         return false
     end
-    -- Verificar si el brainrot está cerca y sigue al jugador
     local distance = (hrp.Position - brainrotHrp.Position).Magnitude
-    local isFollowing = not brainrotHrp.Anchored and distance <= CONFIG.MAX_DISTANCE
-    -- Verificar si tiene BodyPosition o BodyVelocity (indica que sigue al jugador)
-    local hasBodyMover = brainrotHrp:FindFirstChildWhichIsA("BodyPosition") or
-                         brainrotHrp:FindFirstChildWhichIsA("BodyVelocity")
-    return isFollowing or hasBodyMover
+    local isFollowing = (not brainrotHrp.Anchored and distance <= CONFIG.MAX_DISTANCE) or
+                       brainrotHrp:FindFirstChildWhichIsA("BodyPosition") or
+                       brainrotHrp:FindFirstChildWhichIsA("BodyVelocity") or
+                       brainrotHrp:FindFirstChildWhichIsA("WeldConstraint")
+    return isFollowing
 end
 
 -- Función para mover brainrot a la base
@@ -210,78 +232,162 @@ local function moveBrainrotToBase(brainrot)
         return
     end
 
-    -- Verificar si la base está bloqueada
-    local laserGate = myBase:FindFirstChild("Gate") or myBase:FindFirstChild("LaserGate") or myBase:FindFirstChild("Barrier")
+    local laserGate = myBase:FindFirstChild("Gate") or
+                      myBase:FindFirstChild("LaserGate") or
+                      myBase:FindFirstChild("Barrier")
     if laserGate and laserGate:IsA("BasePart") and laserGate.Transparency == 0 then
         statusLabel.Text = "Status: Base bloqueada, esperando..."
         task.wait(5)
         return
     end
 
-    -- Anclar el brainrot para evitar que se mueva mientras se tweanea
     brainrotHrp.Anchored = true
-
-    -- Simular movimiento natural a la base
     local targetCFrame = myBase.PrimaryPart.CFrame * CFrame.new(0, 5, 0)
     local tweenInfo = TweenInfo.new(CONFIG.TWEEN_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
     local tween = TweenService:Create(brainrotHrp, tweenInfo, {CFrame = targetCFrame})
     tween:Play()
-
-    -- Actualizar estado
     statusLabel.Text = "Status: Moviendo brainrot a base..."
-
-    -- Limpiar después del tween
     tween.Completed:Connect(function()
         brainrotHrp.Anchored = false
         statusLabel.Text = "Status: Brainrot movido!"
     end)
 end
+-- Función para teletransportarse al techo y robar
+local function smartSteal()
+    if isEnemyNearby() then
+        statusLabel.Text = "Status: Jugadores cerca, esperando..."
+        return
+    end
 
--- Función para detectar brainrots valiosos en el servidor
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        statusLabel.Text = "Status: Personaje no encontrado"
+        return
+    end
+    local hrp = character.HumanoidRootPart
+
+    local enemyBase
+    local function scanBases(container)
+        for _, ply in ipairs(Players:GetPlayers()) do
+            if ply ~= LocalPlayer then
+                local baseNames = {
+                    "Base_" .. ply.Name,
+                    "Plot_" .. ply.Name,
+                    "Base_" .. ply.UserId,
+                    "Plot_" .. ply.UserId,
+                    "Base_" .. ply.DisplayName,
+                    "Plot_" .. ply.DisplayName
+                }
+                for _, name in ipairs(baseNames) do
+                    local base = container:FindFirstChild(name)
+                    if base then
+                        enemyBase = base
+                        return true
+                    end
+                end
+            end
+        end
+        return false
+    end
+
+    if not scanBases(Workspace) then
+        local plots = Workspace:FindFirstChild("Plots")
+        if plots then scanBases(plots) end
+    end
+
+    if not enemyBase then
+        statusLabel.Text = "Status: No se encontraron bases enemigas"
+        return
+    end
+
+    local basePart = enemyBase:FindFirstChildWhichIsA("BasePart") or
+                     enemyBase:FindFirstChild("BasePlate") or
+                     enemyBase:FindFirstChild("Root") or
+                     enemyBase:FindFirstChild("MainPart")
+    if not basePart then
+        statusLabel.Text = "Status: Base enemiga inválida"
+        return
+    end
+
+    local rayOrigin = basePart.Position + Vector3.new(0, 100, 0)
+    local rayDirection = Vector3.new(0, -200, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+    local targetPos = result and result.Position + Vector3.new(0, CONFIG.ROOF_HEIGHT, 0) or
+                      basePart.Position + Vector3.new(0, CONFIG.ROOF_HEIGHT, 0)
+
+    local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
+    tween:Play()
+    statusLabel.Text = "Status: Teletransportando a techo de " .. enemyBase.Name
+    tween.Completed:Connect(function()
+        statusLabel.Text = "Status: En techo, robando..."
+        pcall(function()
+            remote:FireServer("Odin Din Din Dun")
+        end)
+    end)
+end
+
+-- Función para detectar brainrots valiosos
 local function listValuableBrainrots()
     statusLabel.Text = "Status: Escaneando brainrots valiosos..."
     local valuableFound = {}
 
-    -- Escanear bases de otros jugadores
     local function scanBases(container)
         for _, ply in ipairs(Players:GetPlayers()) do
             if ply ~= LocalPlayer then
-                local theirBase = container:FindFirstChild("Base_" .. ply.Name) or
-                                  container:FindFirstChild("Plot_" .. ply.Name) or
-                                  container:FindFirstChild("Base_" .. ply.UserId) or
-                                  container:FindFirstChild("Plot_" .. ply.UserId)
-                if theirBase then
-                    for _, br in ipairs(theirBase:GetChildren()) do
-                        if br:IsA("Model") then
-                            local brHrp = br:FindFirstChild("HumanoidRootPart") or
-                                          br:FindFirstChild("Root") or
-                                          br:FindFirstChild("MainPart")
-                            if brHrp then
-                                local brName = br.Name
-                                local isValuable = VALUABLE_BRAINROTS[brName] or false
-                                local hasMutation = false
-                                -- Verificar mutaciones en el nombre
-                                for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
-                                    if string.find(brName:lower(), mutation:lower()) then
-                                        hasMutation = true
-                                        break
-                                    end
-                                end
-                                -- Verificar mutaciones en propiedades
-                                local mutationValue = br:FindFirstChild("Mutation") or br:FindFirstChild("Variant")
-                                if mutationValue and mutationValue:IsA("StringValue") then
+                local baseNames = {
+                    "Base_" .. ply.Name,
+                    "Plot_" .. ply.Name,
+                    "Base_" .. ply.UserId,
+                    "Plot_" .. ply.UserId,
+                    "Base_" .. ply.DisplayName,
+                    "Plot_" .. ply.DisplayName
+                }
+                for _, name in ipairs(baseNames) do
+                    local theirBase = container:FindFirstChild(name)
+                    if theirBase then
+                        for _, br in ipairs(theirBase:GetChildren()) do
+                            if br:IsA("Model") then
+                                local brHrp = br:FindFirstChild("HumanoidRootPart") or
+                                              br:FindFirstChild("Root") or
+                                              br:FindFirstChild("MainPart")
+                                if brHrp then
+                                    local brName = br.Name
+                                    local isValuable = VALUABLE_BRAINROTS[brName] or false
+                                    local hasMutation = false
                                     for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
-                                        if mutationValue.Value:lower() == mutation:lower() then
+                                        if string.find(brName:lower(), mutation:lower()) then
                                             hasMutation = true
                                             break
                                         end
                                     end
-                                end
-                                if isValuable or hasMutation then
-                                    local income = isValuable and VALUABLE_BRAINROTS[brName].income or "Unknown"
-                                    local distance = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
-                                                    (brHrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude or "Unknown"
-                                    table.insert(valuableFound, string.format("%s (%s/s, %.1f studs) en base de %s", brName, tostring(income), distance, ply.Name))
+                                    local mutationValue = br:FindFirstChild("Mutation") or br:FindFirstChild("Variant")
+                                    if mutationValue and mutationValue:IsA("StringValue") then
+                                        for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
+                                            if mutationValue.Value:lower() == mutation:lower() then
+                                                hasMutation = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if br:GetAttribute("Mutation") then
+                                        for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
+                                            if br:GetAttribute("Mutation"):lower() == mutation:lower() then
+                                                hasMutation = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                    if isValuable or hasMutation then
+                                        local income = isValuable and VALUABLE_BRAINROTS[brName].income or "Unknown"
+                                        local distance = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
+                                                        (brHrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude or "Unknown"
+                                        table.insert(valuableFound, string.format("%s (%s/s, %.1f studs) en base de %s", brName, tostring(income), distance, ply.Name))
+                                    end
                                 end
                             end
                         end
@@ -291,13 +397,14 @@ local function listValuableBrainrots()
         end
     end
 
-    -- Escanear en Workspace y Workspace.Plots
     scanBases(Workspace)
-    local plots = Workspace:FindFirstChild("Plots")
-    if plots then scanBases(plots) end
+    for _, folder in ipairs(Workspace:GetChildren()) do
+        if folder:IsA("Folder") or folder:IsA("Model") then
+            scanBases(folder)
+        end
+    end
 
-    -- Escanear conveyor central
-    local conveyorNames = {"Conveyor", "ConveyorBelt", "BrainrotSpawner"}
+    local conveyorNames = {"Conveyor", "ConveyorBelt", "BrainrotSpawner", "MainConveyor"}
     local conveyor
     for _, name in ipairs(conveyorNames) do
         conveyor = Workspace:FindFirstChild(name)
@@ -328,6 +435,14 @@ local function listValuableBrainrots()
                             end
                         end
                     end
+                    if br:GetAttribute("Mutation") then
+                        for _, mutation in ipairs(VALUABLE_BRAINROTS.Mutations) do
+                            if br:GetAttribute("Mutation"):lower() == mutation:lower() then
+                                hasMutation = true
+                                break
+                            end
+                        end
+                    end
                     if isValuable or hasMutation then
                         local income = isValuable and VALUABLE_BRAINROTS[brName].income or "Unknown"
                         local distance = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and
@@ -341,7 +456,6 @@ local function listValuableBrainrots()
         statusLabel.Text = "Status: Conveyor no encontrado"
     end
 
-    -- Actualizar GUI
     if #valuableFound > 0 then
         valuableList.Text = "Valuable Brainrots:\n" .. table.concat(valuableFound, "\n")
     else
@@ -363,12 +477,10 @@ local function stealBrainrots()
         else
             pcall(function()
                 for _, obj in ipairs(Workspace:GetChildren()) do
-                    if obj:IsA("Model") then
-                        if isBrainrotInHands(obj) then
-                            statusLabel.Text = "Status: Brainrot robado detectado!"
-                            moveBrainrotToBase(obj)
-                            task.wait(CONFIG.TWEEN_DURATION + 0.5)
-                        end
+                    if obj:IsA("Model") and isBrainrotInHands(obj) then
+                        statusLabel.Text = "Status: Brainrot robado detectado!"
+                        moveBrainrotToBase(obj)
+                        task.wait(CONFIG.TWEEN_DURATION + 0.5)
                     end
                 end
             end)
@@ -379,6 +491,7 @@ end
 -- Añadir botones
 addButton("🧠 Steal Brainrots", stealBrainrots, 40)
 addButton("🔍 List Valuable Brainrots", listValuableBrainrots, 70)
+addButton("🔝 Smart Steal (Roof TP)", smartSteal, 100)
 
 -- Anti-kick pasivo
 game.Players.LocalPlayer.OnTeleport:Connect(function(state)
