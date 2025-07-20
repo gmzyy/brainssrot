@@ -4,20 +4,17 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
-local remote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("StealRemote")
 
 -- Configuración
 local CONFIG = {
     TWEEN_DURATION = 2, -- Duración del tween para movimientos naturales
     MAX_DISTANCE = 10, -- Distancia máxima para considerar un brainrot "en tus manos"
     CHECK_INTERVAL = 1, -- Intervalo para verificar brainrots
-    RANDOM_DELAY_MIN = 0.2, -- Retraso aleatorio mínimo
-    RANDOM_DELAY_MAX = 0.4, -- Retraso aleatorio máximo
     ENEMY_CHECK_DISTANCE = 50, -- Distancia para verificar jugadores enemigos
     ROOF_HEIGHT = 20, -- Altura para teletransportarse al techo
 }
 
--- Lista de brainrots valiosos (basado en la wiki)
+-- Lista de brainrots valiosos
 local VALUABLE_BRAINROTS = {
     ["Graipuss Medussi"] = {cost = 250000000, income = 1000000},
     ["Los Tralaleritos"] = {cost = 100000000, income = 500000},
@@ -25,18 +22,24 @@ local VALUABLE_BRAINROTS = {
     Mutations = {"Galactic", "Golden", "Diamond", "Rainbow"}
 }
 
+-- Intentar encontrar StealRemote
+local remote
+pcall(function()
+    remote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("StealRemote", 5)
+end)
+
 -- GUI protegida
 local parentGui = RunService:IsStudio() and LocalPlayer:WaitForChild("PlayerGui") or game:GetService("CoreGui")
 
 -- Eliminar GUI anterior
-local existingGui = parentGui:FindFirstChild("MartinBrainrotGUI")
+local existingGui = parentGui:FindFirstChild("BrainrotGUI")
 if existingGui then
     existingGui:Destroy()
 end
 
 -- Crear GUI con animación de introducción
 local gui = Instance.new("ScreenGui")
-gui.Name = "MartinBrainrotGUI"
+gui.Name = "BrainrotGUI"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = parentGui
@@ -88,7 +91,7 @@ statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.new(1, 1, 1)
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextSize = 12
-statusLabel.Text = "Status: Idle"
+statusLabel.Text = remote and "Status: Idle" or "Status: StealRemote no encontrado"
 
 -- Lista de brainrots valiosos
 local valuableList = Instance.new("TextLabel", frame)
@@ -141,7 +144,8 @@ local function getPlayerBase()
         "Base_" .. LocalPlayer.UserId,
         "Plot_" .. LocalPlayer.UserId,
         "Base_" .. LocalPlayer.DisplayName,
-        "Plot_" .. LocalPlayer.DisplayName
+        "Plot_" .. LocalPlayer.DisplayName,
+        "PlayerBase_" .. LocalPlayer.Name
     }
     local base
     for _, name in ipairs(baseNames) do
@@ -252,8 +256,13 @@ local function moveBrainrotToBase(brainrot)
         statusLabel.Text = "Status: Brainrot movido!"
     end)
 end
+
 -- Función para teletransportarse al techo y robar
 local function smartSteal()
+    if not remote then
+        statusLabel.Text = "Status: StealRemote no encontrado"
+        return
+    end
     if isEnemyNearby() then
         statusLabel.Text = "Status: Jugadores cerca, esperando..."
         return
@@ -276,7 +285,8 @@ local function smartSteal()
                     "Base_" .. ply.UserId,
                     "Plot_" .. ply.UserId,
                     "Base_" .. ply.DisplayName,
-                    "Plot_" .. ply.DisplayName
+                    "Plot_" .. ply.DisplayName,
+                    "PlayerBase_" .. ply.Name
                 }
                 for _, name in ipairs(baseNames) do
                     local base = container:FindFirstChild(name)
@@ -345,7 +355,8 @@ local function listValuableBrainrots()
                     "Base_" .. ply.UserId,
                     "Plot_" .. ply.UserId,
                     "Base_" .. ply.DisplayName,
-                    "Plot_" .. ply.DisplayName
+                    "Plot_" .. ply.DisplayName,
+                    "PlayerBase_" .. ply.Name
                 }
                 for _, name in ipairs(baseNames) do
                     local theirBase = container:FindFirstChild(name)
